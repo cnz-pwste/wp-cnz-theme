@@ -1,0 +1,288 @@
+<?php
+/**
+ * Products Widget Class
+ *
+ * @package CNZ_Theme
+ */
+
+if( ! class_exists( 'CNZ_Theme_Products_Widget' ) ) {
+
+    class CNZ_Theme_Products_Widget extends WP_Widget {
+     
+        function __construct() { 
+
+            parent::__construct(
+                'cnz-pwste-products-widget',
+                esc_html__( 'OS: Products', 'cnz-pwste' ),
+                array(
+                    'classname'     => '',
+                    'description'   => esc_html__( 'Displays products.', 'cnz-pwste' ), 
+                )
+            );     
+        }
+     
+        public function widget( $args, $instance ) {
+
+            $title = apply_filters( 'widget_title', empty( $instance['title'] ) ? '' : $instance['title'], $instance, $this->id_base );
+            $product_category = isset( $instance['product_category'] ) ? $instance['product_category'] : '';
+            $no_of_products = isset( $instance['no_of_products'] ) ? $instance['no_of_products'] : 4;
+            $products_by = isset( $instance['products_by'] ) ? $instance['products_by'] :'default';
+            $display_layout = isset( $instance['display_layout'] ) ? $instance['display_layout'] : 'slider';
+
+            $product_query_args = array(
+                'post_type' => 'product',
+            );
+
+            if( $no_of_products > 0 ) {
+                $product_query_args['posts_per_page'] = $no_of_products;
+            } else {
+                $product_query_args['posts_per_page'] = 4;
+            }
+
+            if( $product_category != '0' ) {
+                $product_query_args['tax_query'][] = array(
+                    array(
+                        'taxonomy'  => 'product_cat',
+                        'field'     => 'slug',
+                        'terms'     => $product_category
+                    )
+                );
+            }
+
+            switch( $products_by ) {
+
+                case 'rated' :
+
+                        $product_query_args['meta_key']       = '_wc_average_rating';
+                        $product_query_args['orderby']        = 'meta_value_num';
+                        $product_query_args['order']          = 'DESC';
+                        $product_query_args['meta_query']     = WC()->query->get_meta_query();
+                    break;
+
+                case 'featured' :
+
+                    $product_query_args['tax_query'][] = array(
+
+                        'taxonomy' => 'product_visibility',
+                        'field'    => 'name',
+                        'terms'    => 'featured',
+                        'operator' => 'AND',
+                    );
+
+                    break;
+
+                case 'onsale' :
+
+                    $product_query_args['meta_key']       = '_sale_price';
+                    $product_query_args['meta_value']     = '0';
+                    $product_query_args['meta_compare']   = '>=';
+                    $product_query_args['order']          = 'DESC';
+
+                    break;
+
+                default :
+
+                    break;
+            }
+
+            $product_query = new WP_Query( $product_query_args );
+
+            if( $product_query->have_posts() ) {
+
+                $mobile_cols_no = get_theme_mod( 'cnz_field_product_cols_in_mobile', 1 );
+
+                $mobile_col_class = 'os-mobile-col-' . $mobile_cols_no;
+
+                if( $display_layout == 'grid' ) {
+                    ?>
+                    <section class="product-widget product-widget-style-1 section-spacing">
+                        <div class="section-inner">
+                            <div class="__os-container__">
+                                <div class="widget-entry">
+                                    <?php
+                                    if( !empty( $title ) ) {
+                                        ?>
+                                        <div class="section-title">
+                                            <h2><?php echo esc_html( $title ); ?></h2>
+                                        </div><!-- .section-title -->
+                                        <?php
+                                    }
+                                    ?>
+                                    <div class="product-entry">
+                                        <div class="woocommerce columns-4 <?php echo esc_attr( $mobile_col_class ); ?>">
+                                            <ul class="products">
+                                                <?php
+                                                while( $product_query->have_posts() ) {
+
+                                                    $product_query->the_post();
+                                                    
+                                                    wc_get_template_part( 'content', 'product' );
+                                                }
+
+//                                                woocommerce_reset_loop();
+
+                                                wp_reset_postdata();
+                                                ?>
+                                            </ul>
+                                        </div><!-- .woocommerce.columns-4 -->
+                                    </div><!-- .product-entry -->
+                                </div><!-- .widget-entry -->
+                            </div><!-- .__os-container__ -->
+                        </div><!-- .section-inner -->
+                    </section><!-- .product-widget.product-widget-style-1.section-spacing -->
+                    <?php    
+                }
+
+                if( $display_layout == 'slider' ) {
+                    ?>
+                    <section class="product-widget product-widget-style-3 section-spacing">
+                        <div class="section-inner">
+                            <div class="__os-container__">
+                                <?php
+                                if( !empty( $title ) ) {
+                                    ?>
+                                    <div class="section-title">
+                                        <h2><?php echo esc_html( $title ); ?></h2>
+                                    </div>
+                                    <?php
+                                }
+                                ?>
+                                <div class="product-entry">
+                                    <div class="owl-carousel owl-carousel-2">
+                                        <?php
+                                        while( $product_query->have_posts() ) {
+
+                                            $product_query->the_post();
+                                            ?>
+                                            <div class="item">
+                                                <div class="woocommerce columns-1 <?php echo esc_attr( $mobile_col_class ); ?>">
+                                                    <ul class="products">
+                                                        <?php wc_get_template_part( 'content', 'product' ); ?>
+                                                    </ul>
+                                                </div><!-- .woocommerce.columns-1 -->
+                                            </div>
+                                            <?php
+                                        }
+//                                        woocommerce_reset_loop();
+
+                                        wp_reset_postdata();
+                                        ?>
+                                    </div><!-- .owl-carousel -->
+                                </div><!-- .product-entry -->
+                            </div><!-- .__os-container__ -->
+                        </div><!-- .section-inner -->
+                    </section><!-- .product-widget -->
+                    <?php
+                }
+            } 
+        }
+     
+        public function form( $instance ) {
+
+            $defaults = array(
+                'title'                 => '',
+                'product_category'      => '',
+                'no_of_products'        => 4,
+                'products_by'           => 'default',
+                'display_layout'        => 'slider',
+            );
+
+            $instance = wp_parse_args( (array) $instance, $defaults );
+    		?>
+    		<p>
+                <label for="<?php echo esc_attr( $this->get_field_id('title') ); ?>">
+                    <strong><?php esc_html_e( 'Title', 'cnz-pwste' ); ?></strong>
+                </label>
+                <input class="widefat" id="<?php echo esc_attr( $this->get_field_id('title') ); ?>" name="<?php echo esc_attr( $this->get_field_name('title') ); ?>" type="text" value="<?php echo esc_attr( $instance['title'] ); ?>" />   
+            </p>
+
+            <p>
+                <label for="<?php echo esc_attr( $this->get_field_id('product_category') ); ?>">
+                    <strong><?php esc_html_e( 'Product Category', 'cnz-pwste' ); ?></strong>
+                </label>
+                <?php 
+                wp_dropdown_categories( array(
+                    'taxonomy'          => 'product_cat',
+                    'show_option_all'   => esc_html__('Select Category','cnz-pwste'),
+                    'name'              => $this->get_field_name('product_category'),
+                    'id'                => $this->get_field_id('product_category'),
+                    'class'             => 'widefat',
+                    'value_field'       => 'slug',
+                    'hide_empty'        => 1,
+                    'selected'          => isset( $instance['product_category'] ) ? $instance['product_category'] : '',
+                ) );
+                ?>
+                <span class="sldr-elmnt-desc"><?php esc_html_e( 'If no category is selected, then latest products are displayed.', 'cnz-pwste' ); ?></span>
+            </p>
+
+            <p>
+                <label for="<?php echo esc_attr( $this->get_field_id('no_of_products') ); ?>">
+                    <strong><?php esc_html_e('No of Products', 'cnz-pwste'); ?></strong>
+                </label>
+                <input class="widefat" id="<?php echo esc_attr( $this->get_field_id('no_of_products') ); ?>" name="<?php echo esc_attr( $this->get_field_name('no_of_products') ); ?>" type="number" value="<?php echo esc_attr( absint( $instance['no_of_products'] ) ); ?>" />   
+            </p>
+
+            <p>
+                <label for="<?php echo esc_attr( $this->get_field_id('products_by') ); ?>">
+                    <strong><?php esc_html_e('Products By', 'cnz-pwste'); ?></strong>
+                </label>
+                <?php
+                $product_types = array(
+                    'default' => esc_html__( 'None', 'cnz-pwste' ),
+                    'rated' => esc_html__( 'Rated', 'cnz-pwste' ),
+                    'featured' => esc_html__( 'Featured', 'cnz-pwste' ),
+                    'onsale' => esc_html__( 'On Sale', 'cnz-pwste' ),
+                );
+                ?>
+                <select class="widefat" name="<?php echo esc_attr( $this->get_field_name('products_by') ); ?>" id="<?php echo esc_attr( $this->get_field_id('products_by') ); ?>">
+                    <?php
+                    foreach( $product_types as $key => $value ) {
+                        ?>
+                        <option value="<?php echo esc_attr( $key ); ?>" <?php selected( $key, $instance['products_by'] ); ?>><?php echo esc_html( $value ); ?></option>
+                        <?php
+                    }
+                    ?>
+                </select>
+            </p>
+
+            <p>
+                <label for="<?php echo esc_attr( $this->get_field_id('display_layout') ); ?>">
+                    <strong><?php esc_html_e('Display Layout', 'cnz-pwste'); ?></strong>
+                </label>
+                <?php
+                $product_types = array(
+                    'slider' => esc_html__( 'Slider', 'cnz-pwste' ),
+                    'grid' => esc_html__( 'Grid', 'cnz-pwste' ),
+                );
+                ?>
+                <select class="widefat" name="<?php echo esc_attr( $this->get_field_name('display_layout') ); ?>" id="<?php echo esc_attr( $this->get_field_id('display_layout') ); ?>">
+                    <?php
+                    foreach( $product_types as $key => $value ) {
+                        ?>
+                        <option value="<?php echo esc_attr( $key ); ?>" <?php selected( $key, $instance['display_layout'] ); ?>><?php echo esc_html( $value ); ?></option>
+                        <?php
+                    }
+                    ?>
+                </select>
+            </p>
+    		<?php
+        }
+     
+        public function update( $new_instance, $old_instance ) {
+     
+            $instance = $old_instance;
+
+            $instance['title']                  = sanitize_text_field( $new_instance['title'] );
+
+            $instance['product_category']       = sanitize_text_field( $new_instance['product_category'] );
+
+            $instance['no_of_products']         = absint( $new_instance['no_of_products'] );
+
+            $instance['products_by']            = sanitize_text_field( $new_instance['products_by'] );
+
+            $instance['display_layout']         = sanitize_text_field( $new_instance['display_layout'] );
+
+            return $instance;
+        } 
+    }
+}
